@@ -76,13 +76,16 @@ def chat_question(text: str, bot_login: str, reply_all: bool) -> str | None:
     return None
 
 
-def clean_chat_reply(text: str) -> str:
-    """Drop the coding-agent 'I'll go look' sentence if one got glued on."""
+def clean_chat_reply(text: str, user: str = "") -> str:
+    """Drop a planning sentence and a leading @mention. The bot adds the mention."""
     text = " ".join(text.split())
     if PLANNING.match(text):
         pieces = re.split(r"(?<=[.!])\s*", text, maxsplit=1)
         if len(pieces) == 2 and pieces[1].strip():
             text = pieces[1].strip()
+    if user:
+        mention = re.compile(rf"^(?:@{re.escape(user)}\b[:,\s-]*)+", re.IGNORECASE)
+        text = mention.sub("", text).strip()
     return text
 
 
@@ -96,7 +99,8 @@ def build_chat_prompt(user: str, question: str, recent: list[tuple[str, str]]) -
         "Recent channel chat, for context only. Do not answer those lines.\n"
         f"{context}\n\n"
         f"Reply to {user}, who is on the owner's whitelist.\n"
-        "Write only the chat line. Do not say you will look, check, or do a task.\n"
+        "Write only the chat line. Do not start with @ or their name.\n"
+        "Do not say you will look, check, or do a task.\n"
         f"Their message: {question}"
     )
 

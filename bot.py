@@ -302,7 +302,7 @@ class Bot:
         with self.recent_lock:
             recent = list(self.recent)
         prompt = build_chat_prompt(user, question, recent)
-        text = clean_chat_reply(self.grok.ask(prompt, CHAT_RULES))
+        text = clean_chat_reply(self.grok.ask(prompt, CHAT_RULES), user)
         if not text:
             return
         if len(text) > 450:

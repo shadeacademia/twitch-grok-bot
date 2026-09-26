@@ -36,6 +36,12 @@ class ChatGateTest(unittest.TestCase):
         )
         self.assertEqual(clean_chat_reply(raw), "Yes. Leave the tokens out.")
 
+    def test_leading_mention_is_stripped(self):
+        self.assertEqual(
+            clean_chat_reply("@shadeacademia yeah i'm good", "shadeacademia"),
+            "yeah i'm good",
+        )
+
     def test_mod_decision_parser(self):
         self.assertEqual(
             parse_mod_decision('{"action":"timeout","seconds":90,"reason":"scam"}'),
