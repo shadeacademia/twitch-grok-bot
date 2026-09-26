@@ -1,0 +1,4 @@
+# One word or phrase per line. Matched case-insensitively.
+buy followers
+viewbot
+free nitro

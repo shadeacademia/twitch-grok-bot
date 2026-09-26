@@ -1,0 +1,3 @@
+# One Twitch login per line. The channel owner can always talk, and can add people
+# from chat with: !allow someuser
+# Remove with: !unallow someuser
