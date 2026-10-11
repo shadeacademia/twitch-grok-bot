@@ -30,3 +30,14 @@ Everyone else is ignored, aside from moderation.
 
 Each reply is one Grok turn, one at a time, so a busy chat does not fire them all at once.
 A reply usually takes a few seconds. The default model is `grok-4.7-build-fast` at low effort, which is the quicker setting this login accepts.
+
+## DJ requests
+
+grok-dj must already be open on this machine. The bot talks to it on localhost and does not start it.
+
+- `!dj` — anyone; what grok-dj is, the commands, and whether requests are on
+- `!song` — auth; what's playing
+- `!sr song` — auth; queue a track when requests are on
+- `!requests on` / `!requests off` — owner
+
+Skip, pause, and resume stay on the grok-dj window. Requests start off each time the bot starts. If grok-dj isn't running, the bot says so.

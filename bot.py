@@ -30,6 +30,14 @@ from chat import (
     parse_mod_decision,
     strip_action,
 )
+from dj import (
+    DjDecision,
+    busy_replies,
+    decide_dj_command,
+    error_whisper,
+    run_queue,
+    run_song,
+)
 from grok_bridge import GrokBridge, GrokError
 from moderate import LocalMod
 from whitelist import Whitelist, normalize_login
@@ -128,6 +136,7 @@ class Bot:
         self.outbound: queue.Queue[str] = queue.Queue()
         self.sock: socket.socket | None = None
         self.stop = threading.Event()
+        self.requests_enabled = False
 
     def may_chat(self, login: str) -> bool:
         return login in self.owners or self.whitelist.allows(login)
@@ -211,6 +220,18 @@ class Bot:
     def _on_message(self, login: str, tags: dict[str, str], text: str) -> None:
         privileged = is_privileged(tags, login, self.owners)
         command = parse_command(text)
+        if command:
+            decision = decide_dj_command(
+                command[0],
+                command[1],
+                user=login,
+                is_owner=login in self.owners,
+                may_chat=self.may_chat(login),
+                requests_on=self.requests_enabled,
+            )
+            if decision is not None:
+                self._apply_dj(login, decision)
+                return
         if command and command[0] in {"allow", "unallow", "whitelist"}:
             self._owner_command(login, command[0], command[1])
             return
@@ -276,8 +297,63 @@ class Bot:
         except queue.Full:
             if kind == "chat":
                 self.say(f"@{user} busy, try again in a minute")
+            elif kind in {"dj_sr", "dj_song"}:
+                command = "sr" if kind == "dj_sr" else "song"
+                channel, whisper = busy_replies(user, command, text)
+                self.say(channel)
+                self.whisper(whisper)
             return False
         return True
+
+    def _apply_dj(self, login: str, decision: DjDecision) -> None:
+        if decision.action == "ignore":
+            return
+        if decision.requests_on is not None:
+            self.requests_enabled = decision.requests_on
+        if decision.action == "say":
+            self.say(decision.channel)
+            return
+        if decision.action == "error":
+            self.say(decision.channel)
+            self.whisper(decision.whisper)
+            return
+        if decision.action == "enqueue":
+            now = time.monotonic()
+            if now - self.last_reply.get(login, 0) < self.cooldown:
+                return
+            if self._enqueue(decision.job or "", login, decision.query, ""):
+                self.last_reply[login] = now
+
+    def _handle_job(self, kind: str, user: str, text: str, msg_id: str) -> None:
+        try:
+            if kind == "dj_sr":
+                channel, whisper = run_queue(user, text)
+                self.say(channel)
+                if whisper:
+                    self.whisper(whisper)
+                return
+            if kind == "dj_song":
+                channel, whisper = run_song(user)
+                self.say(channel)
+                if whisper:
+                    self.whisper(whisper)
+                return
+            if kind == "chat":
+                self._answer(user, text)
+                return
+            self._review(user, text, msg_id)
+        except GrokError as exc:
+            print(f"grok {kind} failed: {exc}", flush=True)
+            if kind == "chat":
+                self.say(f"@{user} I couldn't get an answer out just then")
+        except Exception as exc:
+            print(f"worker error: {exc}", flush=True)
+            if kind == "dj_sr":
+                self.say("couldn't play that")
+                self.whisper(error_whisper(user, "sr", text, str(exc)))
+            elif kind == "dj_song":
+                self.say("couldn't read the DJ")
+                self.whisper(error_whisper(user, "song", "", str(exc)))
 
     def _worker(self) -> None:
         while not self.stop.is_set():
@@ -285,17 +361,13 @@ class Bot:
                 kind, user, text, msg_id = self.jobs.get(timeout=0.5)
             except queue.Empty:
                 continue
-            try:
-                if kind == "chat":
-                    self._answer(user, text)
-                else:
-                    self._review(user, text, msg_id)
-            except GrokError as exc:
-                print(f"grok {kind} failed: {exc}", flush=True)
-                if kind == "chat":
-                    self.say(f"@{user} I couldn't get an answer out just then")
-            except Exception as exc:
-                print(f"worker error: {exc}", flush=True)
+            self._handle_job(kind, user, text, msg_id)
+
+    def whisper(self, text: str) -> None:
+        details = " ".join(text.split())[:400]
+        if not details:
+            return
+        self._send(f"PRIVMSG #{self.channel} :/w {self.channel} {details}")
 
     def _answer(self, user: str, question: str) -> None:
         started = time.monotonic()
