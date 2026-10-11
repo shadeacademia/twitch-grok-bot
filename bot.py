@@ -230,6 +230,8 @@ class Bot:
                 requests_on=self.requests_enabled,
             )
             if decision is not None:
+                if not privileged:
+                    self._local_moderate(login, text, tags.get("id", ""))
                 self._apply_dj(login, decision)
                 return
         if command and command[0] in {"allow", "unallow", "whitelist"}:

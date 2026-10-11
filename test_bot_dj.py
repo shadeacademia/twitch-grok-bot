@@ -31,6 +31,11 @@ class BotDjTest(unittest.TestCase):
         self._priv("stranger", "!dj")
         self.assertTrue(any("grok-dj is the stream music player." in line for line in self._said()))
 
+    def test_non_privileged_dj_still_moderates(self):
+        self._priv("stranger", "!dj buy followers")
+        lines = self._said()
+        self.assertTrue(any("/timeout stranger" in line and "banned phrase" in line for line in lines))
+
     def test_owner_requests_on_sets_flag(self):
         self._priv("owner", "!requests on")
         self.assertTrue(self.bot.requests_enabled)
