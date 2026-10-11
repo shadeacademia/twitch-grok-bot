@@ -28,6 +28,16 @@ class ChatGateTest(unittest.TestCase):
         self.assertEqual(chat_question("!grok what time is it", "grokbot", False), "what time is it")
         self.assertEqual(chat_question("@GrokBot hey", "grokbot", False), "hey")
         self.assertIsNone(chat_question("!allow steve", "grokbot", False))
+        self.assertEqual(parse_command("!sr never gonna"), ("sr", "never gonna"))
+        self.assertEqual(parse_command("!song"), ("song", ""))
+        self.assertEqual(parse_command("!dj"), ("dj", ""))
+        self.assertEqual(parse_command("!requests on"), ("requests", "on"))
+        self.assertEqual(parse_command("!requests off"), ("requests", "off"))
+        self.assertEqual(parse_command("!requests"), ("requests", ""))
+        self.assertIsNone(chat_question("!sr never gonna give you up", "grokbot", False))
+        self.assertIsNone(chat_question("!song", "grokbot", False))
+        self.assertIsNone(chat_question("!dj", "grokbot", False))
+        self.assertIsNone(chat_question("!requests on", "grokbot", False))
 
     def test_planning_sentence_is_stripped(self):
         raw = (
